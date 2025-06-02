@@ -1,59 +1,72 @@
-/** Node class for Binary Tree - each node has a value and up to two children */
+/** Modern class syntax instead of function constructors and prototypes */
 class BinaryTreeNode {
-  constructor(val, left = null, right = null) {
-    this.val = val; // Value stored in the node
-    this.left = left; // Left child reference (null if no left child)
-    this.right = right; // Right child reference (null if no right child)
+  /** Default parameters eliminate need for undefined checks */
+  constructor(value, leftChild = null, rightChild = null) {
+    this.value = value;
+    this.left = leftChild;
+    this.right = rightChild;
   }
 }
 
-/** Binary Tree class - a data structure with a root node and child nodes arranged in a tree */
 class BinaryTree {
+  /** Private class field using # prefix (ES2019+) */
+  #root;
+
+  /** Nullish coalescing operator ?? (ES2020+) only falls back on null/undefined
+   * More precise than || which falls back on any falsy value */
   constructor(root = null) {
-    this.root = root; // Root node of the tree (null for empty tree)
+    this.#root = root ?? null;
   }
 
-  /** Helper method that performs Breadth-First Search traversal
-   * BFS visits nodes level by level, from left to right
-   * fn is a callback function that processes each node */
-  _traverse(fn) {
-    if (!this.root) return null; // Empty tree case
-    // Queue to track nodes to visit, starting with root
+  /** Private method using # prefix (ES2019+)
+   * Encapsulates internal traversal logic */
+  #traverse(callback) {
+    if (!this.#root) return null;
+
     const queue = [
       {
-        node: this.root, // Current node
-        depth: 1, // Level in tree (root is level 1)
-        parent: null, // Parent node reference
+        node: this.#root,
+        depth: 1,
+        parent: null,
       },
     ];
-    let result = null;
 
-    // Process nodes while queue has entries
+    let maxDepth = 1;
+
     while (queue.length) {
-      const current = queue.shift(); // Get next node from front of queue
-      const fnResult = fn(current); // Process current node
-      if (fnResult !== undefined) result = fnResult;
+      // Object destructuring in parameters and variable declarations
+      const { node, depth, parent } = queue.shift();
+      // Call callback with current node info
+      const result = callback({ node, depth, parent });
+      if (result !== undefined) {
+        maxDepth = Math.max(maxDepth, depth);
+      }
 
-      // Add any children to queue for later processing
-      ["left", "right"].forEach((dir) => {
-        const child = current.node[dir];
-        if (child) {
-          queue.push({
-            node: child,
-            depth: current.depth + 1, // Child is one level deeper
-            parent: current.node, // Keep track of parent
-          });
-        }
-      });
+      // Add children to queue if they exist
+      if (node.left) {
+        queue.push({
+          node: node.left,
+          depth: depth + 1,
+          parent: node,
+        });
+      }
+      if (node.right) {
+        queue.push({
+          node: node.right,
+          depth: depth + 1,
+          parent: node,
+        });
+      }
     }
-    return result;
+
+    return maxDepth;
   }
 
   /** Find shortest path from root to any leaf node
    * A leaf node is one with no children */
   minDepth() {
-    if (!this.root) return 0; // Empty tree has depth 0
-    const queue = [{ node: this.root, depth: 1 }];
+    if (!this.#root) return 0; // Empty tree has depth 0
+    const queue = [{ node: this.#root, depth: 1, parent: null, metadata: {} }];
 
     while (queue.length) {
       const { node, depth } = queue.shift();
@@ -68,97 +81,144 @@ class BinaryTree {
 
   /** Find longest path from root to any leaf node */
   maxDepth() {
-    if (!this.root) return 0;
-    let max = 0;
-    // Track maximum depth seen during traversal
-    this._traverse(({ depth }) => void (max = Math.max(max, depth)));
-    return max;
+    if (!this.#root) return 0;
+    // Arrow function with implicit return
+    return this.#traverse(({ depth }) => depth);
   }
 
-  /** Find smallest value in tree that is larger than x */
-  nextLarger(x) {
-    if (!this.root) return null;
-    let result = null;
-    const queue = [this.root];
+  /** Find smallest value in tree that is larger than given value */
+  nextLarger(lowerBound) {
+    if (!this.#root) return null;
+    let smallestLarger = null;
+    const queue = [this.#root];
 
     while (queue.length) {
       const node = queue.shift();
-      // Update result if we find a smaller value that's still bigger than x
-      if (node.val > x && (!result || node.val < result)) {
-        result = node.val;
+      if (
+        node.value > lowerBound &&
+        (smallestLarger === null || node.value < smallestLarger)
+      ) {
+        smallestLarger = node.value;
       }
-      // Add children to continue search
-      node.left && queue.push(node.left);
-      node.right && queue.push(node.right);
+      // Optional chaining operator ?. (ES2020+) safely accesses nested properties
+      // Replaces node && node.left pattern
+      node?.left && queue.push(node.left);
+      node?.right && queue.push(node.right);
     }
-    return result;
+    return smallestLarger;
   }
 
   /** Find path through tree with largest sum of node values */
   maxSum() {
-    if (!this.root) return 0;
+    if (!this.#root) return 0;
+
+    // Use WeakMap to allow garbage collection of nodes
+    const sums = new WeakMap();
     let maxSum = -Infinity;
-    // Use stack for depth-first traversal
-    const stack = [{ node: this.root, phase: 0, sum: 0 }];
-    const sums = new Map(); // Track sums for subtrees
+
+    // Define traversal phases
+    const phases = {
+      visitLeft: 0, // Need to process left subtree
+      visitRight: 1, // Need to process right subtree
+      processNode: 2, // Ready to process current node
+    };
+
+    // Initialize stack with root node
+    const stack = [
+      {
+        node: this.#root,
+        phase: phases.visitLeft,
+      },
+    ];
 
     while (stack.length) {
-      const { node, phase } = stack[stack.length - 1];
+      const current = stack[stack.length - 1];
 
-      // Process node in phases: left child, right child, node itself
-      if (phase === 0) {
-        // Process left subtree
-        stack[stack.length - 1].phase = 1;
-        node.left && stack.push({ node: node.left, phase: 0, sum: 0 });
-      } else if (phase === 1) {
-        // Process right subtree
-        stack[stack.length - 1].phase = 2;
-        node.right && stack.push({ node: node.right, phase: 0, sum: 0 });
+      if (current.phase === phases.visitLeft) {
+        // Visit left child first
+        current.phase = phases.visitRight;
+        if (current.node.left) {
+          stack.push({
+            node: current.node.left,
+            phase: phases.visitLeft,
+          });
+        }
+      } else if (current.phase === phases.visitRight) {
+        // Visit right child next
+        current.phase = phases.processNode;
+        if (current.node.right) {
+          stack.push({
+            node: current.node.right,
+            phase: phases.visitLeft,
+          });
+        }
       } else {
-        // Process current node
-        const current = stack.pop();
-        // Get sums from children
+        // Process current node after both children
+        stack.pop();
+        const node = current.node;
+
+        // Get sums from children (0 if no child exists)
         const leftSum = node.left ? sums.get(node.left) : 0;
         const rightSum = node.right ? sums.get(node.right) : 0;
-        // Calculate sums including current node
-        const totalSum = node.val + Math.max(0, leftSum, rightSum);
-        const pathSum = node.val + Math.max(0, leftSum + rightSum);
 
-        sums.set(node, totalSum);
+        // Calculate max path including current node and best child paths
+        const pathSum = node.value + Math.max(0, leftSum + rightSum);
         maxSum = Math.max(maxSum, pathSum);
+
+        // Store best single path for parent nodes
+        sums.set(node, node.value + Math.max(0, leftSum, rightSum));
       }
     }
-    return Math.max(maxSum, this.root.val);
+
+    // Handle case where root might be best path by itself
+    return Math.max(maxSum, this.#root.value);
   }
 
   /** Check if two nodes are cousins (same depth but different parents) */
-  areCousins(n1, n2) {
-    let d1, d2, p1, p2;
-    // Find depth and parent for both nodes
-    this._traverse(({ node, depth, parent }) => {
-      if (node === n1) [d1, p1] = [depth, parent];
-      if (node === n2) [d2, p2] = [depth, parent];
+  areCousins(node1, node2) {
+    if (!this.#root) return false;
+    if (node1 === this.#root || node2 === this.#root) return false;
+    if (node1 === node2) return false;
+
+    const info = {
+      depth1: null,
+      depth2: null,
+      parent1: null,
+      parent2: null,
+    };
+
+    this.#traverse(({ node, depth, parent }) => {
+      if (node === node1) {
+        info.depth1 = depth;
+        info.parent1 = parent;
+      } else if (node === node2) {
+        info.depth2 = depth;
+        info.parent2 = parent;
+      }
     });
-    // Cousins: same depth, different parents
-    return d1 === d2 && p1 !== p2;
+
+    return (
+      info.depth1 === info.depth2 &&
+      info.parent1 !== info.parent2 &&
+      info.depth1 !== null &&
+      info.parent1 !== null
+    );
   }
 
-  /** Find lowest common ancestor of two nodes
-   * LCA is the deepest node that has both nodes in its subtrees */
-  lowestCommonAncestor(n1, n2) {
-    // Helper to find path from root to node
-    const findPath = (node) => {
-      const stack = [this.root];
-      const paths = new Map([[this.root, [this.root]]]);
+  /** Find lowest common ancestor of two nodes */
+  lowestCommonAncestor(node1, node2) {
+    const findPath = (targetNode) => {
+      const stack = [this.#root];
+      const paths = new Map([[this.#root, [this.#root]]]);
 
       while (stack.length) {
-        const curr = stack.pop();
-        if (curr === node) return paths.get(curr);
+        const node = stack.pop();
+        if (node === targetNode) return paths.get(node);
 
-        // Try to find node in subtrees
-        for (const child of [curr.right, curr.left]) {
+        for (const child of [node.right, node.left]) {
           if (child) {
-            paths.set(child, [...paths.get(curr), child]);
+            // Array destructuring and spread operator ... (ES2015+)
+            paths.set(child, [...paths.get(node), child]);
             stack.push(child);
           }
         }
@@ -167,59 +227,69 @@ class BinaryTree {
     };
 
     // Get paths from root to both nodes
-    const path1 = findPath(n1);
-    const path2 = findPath(n2);
+    const pathToNode1 = findPath(node1);
+    const pathToNode2 = findPath(node2);
 
     // Find where paths diverge - node before is LCA
-    for (let i = 0; i < Math.min(path1.length, path2.length); i++) {
-      if (path1[i] !== path2[i]) return path1[i - 1];
+    for (let i = 0; i < Math.min(pathToNode1.length, pathToNode2.length); i++) {
+      if (pathToNode1[i] !== pathToNode2[i]) return pathToNode1[i - 1];
     }
-    return path1[path1.length - 1]; // One node is ancestor of other
+    return pathToNode1[pathToNode1.length - 1]; // One node is ancestor of other
   }
 
   /** Convert tree to string for storage/transmission */
   static serialize(tree) {
-    if (!tree.root) return "[]";
-    const vals = [],
-      queue = [tree.root];
+    if (!tree.#root) return "[]";
+    const values = [];
+    const queue = [tree.#root];
 
-    // BFS traversal to get node values in level order
     while (queue.length) {
       const node = queue.shift();
-      vals.push(node ? node.val : null); // null for missing nodes
-      node && queue.push(node.left, node.right);
+      values.push(node?.value ?? null);
+      if (node?.left || node?.right) {
+        queue.push(node.left);
+        queue.push(node.right);
+      }
     }
-
-    // Remove trailing nulls to save space
-    while (vals[vals.length - 1] === null) vals.pop();
-    return JSON.stringify(vals);
+    /** Template literals for string interpolation (ES2015+) */
+    return `[${values.join(",")}]`;
   }
 
-  /** Recreate tree from serialized string */
-  static deserialize(str) {
-    const vals = JSON.parse(str);
-    if (!vals.length) return new BinaryTree();
+  /** Rebuild tree from serialized string */
+  static deserialize(serialized) {
+    if (serialized === "[]") return new BinaryTree();
+
+    const values = serialized
+      .slice(1, -1)
+      .split(",")
+      .map((value) => (value === "null" ? null : Number(value)));
 
     // Create root node
-    const root = new BinaryTreeNode(vals[0]);
+    const root = new BinaryTreeNode(values[0]);
     const queue = [root];
+    let index = 1;
 
-    // Rebuild tree level by level
-    for (let i = 1; i < vals.length; i += 2) {
-      const curr = queue.shift();
-      // Create and link left child if exists
-      if (vals[i] !== null) {
-        curr.left = new BinaryTreeNode(vals[i]);
-        queue.push(curr.left);
+    while (queue.length && index < values.length) {
+      const node = queue.shift();
+
+      // Attach left child
+      if (values[index] !== null) {
+        node.left = new BinaryTreeNode(values[index]);
+        queue.push(node.left);
       }
-      // Create and link right child if exists
-      if (i + 1 < vals.length && vals[i + 1] !== null) {
-        curr.right = new BinaryTreeNode(vals[i + 1]);
-        queue.push(curr.right);
+      index++;
+
+      // Attach right child
+      if (index < values.length && values[index] !== null) {
+        node.right = new BinaryTreeNode(values[index]);
+        queue.push(node.right);
       }
+      index++;
     }
+
     return new BinaryTree(root);
   }
 }
 
+/** ES modules export syntax (ES2015+) */
 module.exports = { BinaryTree, BinaryTreeNode };
