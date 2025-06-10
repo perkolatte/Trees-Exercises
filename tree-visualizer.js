@@ -1,3 +1,4 @@
+// filepath: /Users/perkolatte/Documents/Springboard/Projects/Trees Exercises/tree-visualizer.js
 /**
  * Draws a line on the canvas using Bresenham's line algorithm.
  * This version draws dashed lines.
@@ -19,18 +20,14 @@ function drawLineOnCanvas(x1, y1, x2, y2, char, canvas, nodeTextCells) {
 
   const maxIterations = canvas.length * canvas[0].length * 2; // Increased safety margin
   let iterations = 0;
-  // let drawThisPoint = true; // REMOVE: For alternating dashes
 
   while (iterations++ < maxIterations) {
     const cellKey = `${x1},${y1}`;
-    // Only draw if not a pre-marked node text cell
     if (!nodeTextCells.has(cellKey)) {
-      // MODIFIED: Removed drawThisPoint condition
       if (y1 >= 0 && y1 < canvas.length && x1 >= 0 && x1 < canvas[0].length) {
         canvas[y1][x1] = char;
       }
     }
-    // drawThisPoint = !drawThisPoint; // REMOVE: Toggle for the next point to create a dashed effect
 
     if (x1 === x2 && y1 === y2) break;
     e2 = 2 * err;
@@ -49,9 +46,9 @@ function drawLineOnCanvas(x1, y1, x2, y2, char, canvas, nodeTextCells) {
 
 /**
  * Generates a string representation of the visual structure of the tree.
- * @param {BinaryTreeNode | null} rootNode - The root node of the tree.
+ * @param {object | null} rootNode - The root node of the tree (can be BinaryTreeNode or TreeNode).
  * @param {string} logContext - Description of when/why the log is occurring.
- * @param {Set<BinaryTreeNode>} [highlightedNodes=new Set()] - Optional set of nodes to highlight.
+ * @param {Set<object>} [highlightedNodes=new Set()] - Optional set of nodes to highlight.
  * @returns {string} A multi-line string representing the tree.
  */
 function getVisualTreeString(
@@ -67,7 +64,11 @@ function getVisualTreeString(
   }
 
   const getDisplayValue = (node) => {
-    let display = String(node.value);
+    let nodeDisplayVal = node.value !== undefined ? node.value : node.val;
+    if (nodeDisplayVal === undefined) {
+      nodeDisplayVal = "[?]";
+    }
+    let display = String(nodeDisplayVal);
     if (highlightedNodes.has(node)) {
       display += " (*)";
     }
@@ -76,107 +77,118 @@ function getVisualTreeString(
 
   const nodePositions = new Map();
   let maxEncounteredY = 0;
-  // This factor determines how many vertical rows are used for slashes
-  // relative to the horizontal distance to the child.
-  // Lower values make lines flatter (fewer slash rows for a given horizontal offset).
-  // Higher values make lines steeper (more slash rows).
-  // 0.3 means for a horizontal offset of ~7, we'd get ~2 slash rows.
-  // For an offset of 3-4, we'd get 1 slash row.
-  const VERTICAL_SLASH_ROWS_PER_HORIZONTAL_OFFSET_UNIT = 1; // Tunable
+  // This factor times the horizontal offset gives the number of rows for slashes.
+  const VERTICAL_SLASH_ROWS_PER_HORIZONTAL_OFFSET_UNIT = 1;
 
-  // tempMaxDepthForHorizontalOffset is still needed for initialXOffset calculation
-  let tempMaxDepthForHorizontalOffset = 0;
-  function findTreeMaxLevels(node, level) {
+  let actualFullTreeDepth = 0;
+  function calculateActualFullTreeDepth(node, level) {
     if (!node) return;
-    tempMaxDepthForHorizontalOffset = Math.max(
-      tempMaxDepthForHorizontalOffset,
-      level
-    );
-    findTreeMaxLevels(node.left, level + 1);
-    findTreeMaxLevels(node.right, level + 1);
-  }
-  findTreeMaxLevels(rootNode, 0);
+    actualFullTreeDepth = Math.max(actualFullTreeDepth, level);
 
-  const initialXOffset = // This is the x-offset from root to its direct children
-    tempMaxDepthForHorizontalOffset > 0
-      ? Math.pow(2, tempMaxDepthForHorizontalOffset - 1) * 2
-      : 1;
+    // Check for binary tree children first
+    if (node.left || node.right) {
+      calculateActualFullTreeDepth(node.left, level + 1);
+      calculateActualFullTreeDepth(node.right, level + 1);
+    } else if (node.children && Array.isArray(node.children)) {
+      // Then check for general tree children
+      for (const child of node.children) {
+        calculateActualFullTreeDepth(child, level + 1);
+      }
+    }
+  }
+  calculateActualFullTreeDepth(rootNode, 0);
+
+  // initialXOffset is the "half-span" available for children at the current level.
+  // It's based on the full depth to ensure enough space for the widest part of the tree.
+  const initialXOffset =
+    actualFullTreeDepth > 0 ? Math.pow(2, actualFullTreeDepth - 1) * 2 : 1;
 
   function calculatePositionsRecursive(
     parentNode,
-    parentDepth,
+    currentDepth,
     parentX,
     parentY,
-    xOffsetFromParentToChildren
+    xOffsetAvailable // Half-span available for placing children of parentNode
   ) {
-    // This function calculates and sets positions for the children of parentNode,
-    // then recurses.
+    let childrenToLayout = [];
+    // Prioritize binary tree structure if present
+    if (parentNode.left || parentNode.right) {
+      if (parentNode.left) childrenToLayout.push(parentNode.left);
+      if (parentNode.right) childrenToLayout.push(parentNode.right);
+    } else if (parentNode.children && Array.isArray(parentNode.children)) {
+      // Fallback to general tree structure
+      childrenToLayout = parentNode.children;
+    }
 
-    // Calculate the xOffset for the children of these children (i.e., grandchildren of parentNode)
-    const xOffsetForGrandchildren = Math.max(
-      1,
-      Math.round(xOffsetFromParentToChildren / 2)
-    );
+    const numChildrenToLayout = childrenToLayout.length;
+    if (numChildrenToLayout === 0) return;
 
-    // Determine the number of slash rows based on the horizontal offset to these children
+    // The offset for the *children of these children* will be halved.
+    const xOffsetForNextLevel = Math.max(1, Math.round(xOffsetAvailable / 2));
+
+    // Vertical distance to children
     const numSlashRowsForChildren = Math.max(
-      1, // Ensure at least 1 row for slashes
+      1,
       Math.round(
-        VERTICAL_SLASH_ROWS_PER_HORIZONTAL_OFFSET_UNIT *
-          xOffsetFromParentToChildren
+        VERTICAL_SLASH_ROWS_PER_HORIZONTAL_OFFSET_UNIT * xOffsetAvailable
       )
     );
     const childrenY = parentY + numSlashRowsForChildren + 1;
 
-    // Process left child
-    if (parentNode.left) {
-      const childNode = parentNode.left;
-      const childX = parentX - xOffsetFromParentToChildren;
-      const childText = getDisplayValue(childNode);
-
-      nodePositions.set(childNode, {
-        text: childText,
-        x: childX,
-        y: childrenY,
-        width: childText.length,
-      });
-      maxEncounteredY = Math.max(maxEncounteredY, childrenY);
-      // tempMaxDepthForHorizontalOffset is already calculated globally, maxActualDepth isn't strictly needed for y here.
-
-      calculatePositionsRecursive(
-        childNode,
-        parentDepth + 1,
-        childX,
-        childrenY,
-        xOffsetForGrandchildren
+    for (let i = 0; i < numChildrenToLayout; i++) {
+      const childNode = childrenToLayout[i];
+      let childX;
+      let currentChildXOffsetForItsChildren = Math.max(
+        1,
+        Math.round(xOffsetAvailable / 2)
       );
-    }
 
-    // Process right child
-    if (parentNode.right) {
-      const childNode = parentNode.right;
-      const childX = parentX + xOffsetFromParentToChildren;
+      if (parentNode.left || parentNode.right) {
+        // Binary layout
+        if (parentNode.left && parentNode.right) {
+          // Two children
+          if (childNode === parentNode.left)
+            childX = parentX - xOffsetAvailable;
+          else childX = parentX + xOffsetAvailable;
+          // currentChildXOffsetForItsChildren remains xOffsetAvailable / 2
+        } else {
+          // Single child
+          childX = parentX; // Place single child directly under parent
+          // For a single child, its children might not need the full halved original offset.
+          // This could be xOffsetAvailable / 2, or even smaller if we want to compress single branches.
+          // Let's keep it xOffsetAvailable / 2 for now to see the effect of centering.
+          // currentChildXOffsetForItsChildren = Math.max(1, Math.round(xOffsetAvailable / 2));
+        }
+      } else {
+        // General n-ary layout
+        if (numChildrenToLayout === 1) {
+          childX = parentX;
+        } else {
+          childX =
+            parentX +
+            ((i / (numChildrenToLayout - 1)) * 2 - 1) * xOffsetAvailable;
+        }
+        // currentChildXOffsetForItsChildren remains xOffsetAvailable / 2
+      }
+
       const childText = getDisplayValue(childNode);
-
       nodePositions.set(childNode, {
         text: childText,
-        x: childX,
+        x: Math.round(childX), // Ensure integer coordinates
         y: childrenY,
         width: childText.length,
       });
       maxEncounteredY = Math.max(maxEncounteredY, childrenY);
-
       calculatePositionsRecursive(
         childNode,
-        parentDepth + 1,
-        childX,
+        currentDepth + 1,
+        Math.round(childX),
         childrenY,
-        xOffsetForGrandchildren
+        currentChildXOffsetForItsChildren // Use this adjusted offset
       );
     }
   }
 
-  // Set root node's position first
   const rootText = getDisplayValue(rootNode);
   nodePositions.set(rootNode, {
     text: rootText,
@@ -184,25 +196,22 @@ function getVisualTreeString(
     y: 0,
     width: rootText.length,
   });
-  maxEncounteredY = 0; // Root is at y=0
+  maxEncounteredY = 0;
 
-  // Start recursion for children of the root
   calculatePositionsRecursive(rootNode, 0, 0, 0, initialXOffset);
 
   let minX = Infinity;
   let maxX = -Infinity;
 
   if (nodePositions.size === 0 && rootNode) {
-    // Should only happen if root has no children and we didn't set it
     nodePositions.set(rootNode, {
-      text: rootText,
+      text: getDisplayValue(rootNode),
       x: 0,
       y: 0,
-      width: rootText.length,
+      width: getDisplayValue(rootNode).length,
     });
   }
   if (nodePositions.size === 0) {
-    // Still no positions (e.g. if rootNode was null initially)
     return [header, "<error: no node positions calculated>", footer].join("\n");
   }
 
@@ -220,13 +229,13 @@ function getVisualTreeString(
   maxX += xShift + leftPadding;
 
   const canvasWidth = maxX + 2;
-  const canvasHeight = maxEncounteredY + 1; // Use maxEncounteredY
+  const canvasHeight = maxEncounteredY + 1;
   const canvas = Array.from({ length: canvasHeight }, () =>
     Array(canvasWidth).fill(" ")
   );
   const nodeTextCells = new Set();
 
-  // Mark cells occupied by node text
+  // Populate nodeTextCells first
   nodePositions.forEach((pos) => {
     const textStartX = pos.x - Math.floor(pos.width / 2);
     for (let k = 0; k < pos.text.length; k++) {
@@ -248,46 +257,70 @@ function getVisualTreeString(
     const Px = parentInfo.x;
     const Py = parentInfo.y;
 
-    const drawConnectionLine = (childNode, slashChar) => {
+    let childrenOfParent = [];
+    if (parentNode.left || parentNode.right) {
+      if (parentNode.left) childrenOfParent.push(parentNode.left);
+      if (parentNode.right) childrenOfParent.push(parentNode.right);
+    } else if (parentNode.children && Array.isArray(parentNode.children)) {
+      childrenOfParent = parentNode.children;
+    }
+
+    for (const childNode of childrenOfParent) {
       if (childNode && nodePositions.has(childNode)) {
         const childInfo = nodePositions.get(childNode);
         const Cx = childInfo.x;
         const Cy = childInfo.y;
 
-        // Ensure Py and Cy are valid and child is below parent
         if (typeof Py !== "number" || typeof Cy !== "number" || Cy <= Py) {
-          // console.warn("Skipping line due to invalid Y positions", parentNode.value, childNode.value, Py, Cy);
-          return;
+          continue;
         }
 
         const lineStartY = Py + 1;
         const lineEndY = Cy - 1;
 
-        let lineStartX = Px;
-        if (slashChar === "/") lineStartX = Px - 1;
-        else if (slashChar === "\\") lineStartX = Px + 1;
-        const lineEndX = Cx;
+        if (Cx === Px) {
+          // Vertical line
+          for (let y_coord = lineStartY; y_coord <= lineEndY; y_coord++) {
+            if (
+              y_coord >= 0 &&
+              y_coord < canvas.length &&
+              Px >= 0 &&
+              Px < canvas[0].length
+            ) {
+              if (!nodeTextCells.has(`${Px},${y_coord}`)) {
+                canvas[y_coord][Px] = "|";
+              }
+            }
+          }
+        } else {
+          // Slanted line
+          let lineStartX = Px;
+          const slashChar = Cx < Px ? "/" : "\\";
+          // Adjust start X for slanted lines to originate from side of parent or center
+          if (slashChar === "/") lineStartX = Math.max(0, Px - 1);
+          else if (slashChar === "\\")
+            lineStartX = Math.min(canvasWidth - 1, Px + 1);
 
-        if (lineStartY <= lineEndY) {
-          // Check if there's actual space for the line
-          drawLineOnCanvas(
-            lineStartX,
-            lineStartY,
-            lineEndX,
-            lineEndY,
-            slashChar,
-            canvas,
-            nodeTextCells
-          );
+          // Ensure line doesn't start/end inside node text
+          // For simplicity, we rely on nodeTextCells check in drawLineOnCanvas
+          if (lineStartY <= lineEndY) {
+            // Ensure there's space for the line
+            drawLineOnCanvas(
+              lineStartX,
+              lineStartY,
+              Cx, // End X at child's center
+              lineEndY,
+              slashChar,
+              canvas,
+              nodeTextCells
+            );
+          }
         }
       }
-    };
-    // Check if parentNode has children before trying to draw lines
-    if (parentNode.left) drawConnectionLine(parentNode.left, "/");
-    if (parentNode.right) drawConnectionLine(parentNode.right, "\\");
+    }
   });
 
-  // Draw node text onto canvas (overwriting slashes if necessary)
+  // Draw node text on top of lines
   nodePositions.forEach((pos) => {
     const textStartX = pos.x - Math.floor(pos.width / 2);
     for (let k = 0; k < pos.text.length; k++) {
@@ -305,11 +338,21 @@ function getVisualTreeString(
   });
 
   const treeLines = canvas.map((row) => row.join("").trimEnd());
-  const filteredTreeLines = treeLines.filter((line) => line.length > 0);
+  const filteredTreeLines = treeLines.filter(
+    (line) => line.length > 0 || line === ""
+  ); // Keep empty lines if they are part of structure
 
+  // Avoid returning just header/footer if tree is one line and gets trimmed.
+  if (filteredTreeLines.length === 0 && nodePositions.size > 0) {
+    if (canvasHeight > 0 && canvas[0]) {
+      // if root was drawn
+      return [header, canvas[0].join("").trimEnd(), footer].join("\n");
+    }
+  }
   if (filteredTreeLines.length === 0) {
     if (!rootNode) return [header, "<empty tree>", footer].join("\n");
-    return [header, "<empty tree representation>", footer].join("\n");
+    // If rootNode exists but no positions, it's an issue, but visualizer should show something.
+    return [header, getDisplayValue(rootNode), footer].join("\n");
   }
 
   return [header, ...filteredTreeLines, footer].join("\n");
