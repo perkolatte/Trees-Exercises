@@ -1,17 +1,16 @@
+const { getVisualTreeString } = require("./tree-visualizer");
+
 /** Modern class syntax instead of function constructors and prototypes */
 /**
  * Represents a node in a binary tree.
  * Each node holds a value and can have references to a left and a right child node.
- * This uses modern JavaScript class syntax (introduced in ES2015/ES6).
  */
 class BinaryTreeNode {
   /**
    * Creates a new instance of a tree node.
    * @param {*} value - The data to be stored in the node.
    * @param {BinaryTreeNode | null} leftChild - The left child of this node. Defaults to null if not provided.
-   *        (Uses ES2015 default parameter values).
    * @param {BinaryTreeNode | null} rightChild - The right child of this node. Defaults to null if not provided.
-   *        (Uses ES2015 default parameter values).
    */
   constructor(value, leftChild = null, rightChild = null) {
     this.value = value; // The data stored at this node.
@@ -28,45 +27,34 @@ class BinaryTreeNode {
 class BinaryTree {
   /**
    * The root node of the binary tree.
-   * This is a private class field (an ES2019+ feature, denoted by the # prefix).
-   * Private fields can only be accessed and modified from within the BinaryTree class itself,
-   * providing encapsulation and preventing accidental external modification.
+   * This field is private to ensure controlled access from within the class.
    */
   #root;
 
   /**
    * Creates a new binary tree.
    * @param {BinaryTreeNode | null} rootNode - The root node of the tree. Defaults to null for an empty tree.
-   *        (Uses ES2015 default parameter values).
    */
   constructor(rootNode = null) {
-    // The nullish coalescing operator '??' (an ES2020+ feature) is used here.
-    // It means this.#root will be 'rootNode' if 'rootNode' is not null or undefined.
-    // Otherwise (if 'rootNode' is null or undefined), this.#root will be assigned null.
-    // This is more precise than using '||' (logical OR), which would fall back to null
-    // for any "falsy" value of rootNode (like 0, false, '', etc.), not just null/undefined.
+    // Assigns rootNode if provided and not null/undefined, otherwise defaults to null.
     this.#root = rootNode ?? null;
   }
 
   /**
    * A private helper method for traversing the tree using Breadth-First Search (BFS).
-   * BFS explores the tree level by level: it visits all nodes at depth 1,
-   * then all nodes at depth 2, and so on.
-   * This method is private (ES2019+ feature, denoted by #) and intended for internal use
-   * by other methods within the BinaryTree class (like maxDepth, areCousins).
+   * BFS explores the tree level by level.
+   * Intended for internal use by other methods within the BinaryTree class.
    *
    * @param {function} callback - A function to be executed for each node visited during traversal.
    *                              This callback function receives an object containing:
    *                              { node: BinaryTreeNode, depth: number, parent: BinaryTreeNode | null }.
    */
   #traverse(callback) {
-    // If the tree is empty (i.e., #root is null), there's nothing to traverse.
+    // If the tree is empty, there's nothing to traverse.
     if (!this.#root) return;
 
-    // We use a queue (first-in, first-out) to keep track of nodes to visit,
-    // which is characteristic of BFS.
-    // Each item in the queue will be an object storing the node itself,
-    // its depth in the tree, and its parent node.
+    // We use a queue to keep track of nodes to visit for BFS.
+    // Each item stores the node, its depth, and its parent.
     const queue = [
       {
         node: this.#root, // Start traversal with the root node.
@@ -77,16 +65,13 @@ class BinaryTree {
 
     // Continue the traversal as long as there are nodes in the queue to visit.
     while (queue.length > 0) {
-      // Dequeue the next item: remove and get the first element from the queue.
-      // We use object destructuring (an ES2015 feature) to conveniently extract
-      // the node, depth, and parent properties from the dequeued item.
+      // Dequeue and extract node, depth, and parent from the next item.
       const { node, depth, parent } = queue.shift();
 
-      // Execute the provided callback function, passing it the information
-      // about the currently visited node.
+      // Execute the provided callback function with the current node's information.
       callback({ node, depth, parent });
 
-      // If the current node has a left child, add it to the queue to be visited later.
+      // If the current node has a left child, add it to the queue.
       if (node.left) {
         queue.push({
           node: node.left,
@@ -95,7 +80,7 @@ class BinaryTree {
         });
       }
 
-      // If the current node has a right child, add it to the queue as well.
+      // If the current node has a right child, add it to the queue.
       if (node.right) {
         queue.push({
           node: node.right,
@@ -110,253 +95,334 @@ class BinaryTree {
    * Finds the minimum depth of the tree.
    * The minimum depth is the length of the shortest path from the root node to any leaf node.
    * A leaf node is a node that has no children.
-   * This method uses Breadth-First Search (BFS) because BFS explores level by level.
-   * Therefore, the first leaf node encountered during a BFS traversal will be at the minimum depth.
+   * This method uses Breadth-First Search (BFS).
    *
    * @returns {number} The minimum depth of the tree. Returns 0 if the tree is empty.
    */
   minDepth() {
-    // If the tree is empty (no root node), its depth is 0.
-    if (!this.#root) return 0;
+    let visualString;
+    if (!this.#root) {
+      visualString = getVisualTreeString(
+        // Use imported function
+        this.#root, // Pass this.#root
+        "minDepth - result (empty tree)"
+      );
+      console.log(visualString);
+      return 0;
+    }
 
-    // Initialize a queue for BFS. Each item stores a node and its current depth.
-    // Start with the root node at depth 1.
-    const queue = [{ node: this.#root, depth: 1 }];
+    const queue = [{ node: this.#root, depth: 1, path: [this.#root] }];
+    let resultPath = [];
+    let minDepthValue = 0;
 
-    // Continue as long as there are nodes to process in the queue.
     while (queue.length > 0) {
-      // Dequeue the current node and its depth.
-      // Object destructuring (ES2015) is used for convenience.
-      const { node, depth } = queue.shift();
-
-      // Check if the current node is a leaf node (it has no left and no right child).
+      const { node, depth, path } = queue.shift();
       if (!node.left && !node.right) {
-        // If it's a leaf node, we've found the shortest path to a leaf.
-        // Return its depth immediately.
-        return depth;
+        minDepthValue = depth;
+        resultPath = path;
+        break; // Found the shortest path to a leaf
       }
-
-      // If the current node is not a leaf, add its existing children to the queue
-      // to be visited in subsequent iterations.
       if (node.left) {
-        queue.push({ node: node.left, depth: depth + 1 });
+        queue.push({
+          node: node.left,
+          depth: depth + 1,
+          path: [...path, node.left],
+        });
       }
       if (node.right) {
-        queue.push({ node: node.right, depth: depth + 1 });
+        queue.push({
+          node: node.right,
+          depth: depth + 1,
+          path: [...path, node.right],
+        });
       }
     }
-    // This part of the code should ideally not be reached if the tree is valid and non-empty,
-    // as a leaf node (and thus a depth) would have been found and returned by the loop above.
-    // For instance, a tree with only a root node is a leaf, and its depth (1) would be returned.
-    // This line acts as a fallback, though the logic above should cover all valid tree structures.
-    return 0; // Should be unreachable for valid non-empty trees.
+    visualString = getVisualTreeString(
+      // Use imported function
+      this.#root, // Pass this.#root
+      `minDepth - result (depth: ${minDepthValue})`,
+      new Set(resultPath)
+    );
+    console.log(visualString);
+    return minDepthValue;
   }
 
   /**
    * Finds the maximum depth of the tree.
    * The maximum depth is the length of the longest path from the root node to any leaf node.
    * This method utilizes the private #traverse (BFS) helper method.
-   * It keeps track of the largest depth encountered during the traversal.
    *
    * @returns {number} The maximum depth of the tree. Returns 0 if the tree is empty.
    */
   maxDepth() {
-    // If the tree is empty, its maximum depth is 0.
-    if (!this.#root) return 0;
+    let visualString;
+    if (!this.#root) {
+      visualString = getVisualTreeString(
+        // Use imported function
+        this.#root, // Pass this.#root
+        "maxDepth - result (empty tree)"
+      );
+      console.log(visualString);
+      return 0;
+    }
 
-    let currentMaxDepth = 0; // Variable to store the maximum depth found so far.
+    let maxDepthValue = 0;
+    const nodesAtMaxDepth = new Set();
 
-    // Call the private #traverse method. For each node visited by #traverse,
-    // the provided callback function (an arrow function here - ES2015 feature) is executed.
-    // The callback receives an object with a 'depth' property for the current node.
-    this.#traverse(({ depth }) => {
-      // Update currentMaxDepth if the depth of the current node is greater.
-      currentMaxDepth = Math.max(currentMaxDepth, depth);
+    this.#traverse(({ node, depth }) => {
+      if (depth > maxDepthValue) {
+        maxDepthValue = depth;
+        nodesAtMaxDepth.clear();
+        nodesAtMaxDepth.add(node);
+      } else if (depth === maxDepthValue) {
+        nodesAtMaxDepth.add(node);
+      }
     });
-
-    // After traversing all nodes, currentMaxDepth will hold the maximum depth.
-    return currentMaxDepth;
+    visualString = getVisualTreeString(
+      // Use imported function
+      this.#root, // Pass this.#root
+      `maxDepth - result (depth: ${maxDepthValue})`,
+      nodesAtMaxDepth
+    );
+    console.log(visualString);
+    return maxDepthValue;
   }
 
   /**
    * Finds the smallest value in the tree that is strictly larger than a given 'lowerBound'.
-   * This method performs a Breadth-First Search (BFS) to check all nodes in the tree.
+   * This method performs a Breadth-First Search (BFS).
    *
-   * @param {number} lowerBound - The value to compare against. Nodes with values greater than this
-   *                              are considered.
-   * @returns {number | null} The smallest value found that is greater than 'lowerBound'.
-   *                          Returns null if no such value exists or if the tree is empty.
+   * @param {number} lowerBound - The value to compare against.
+   * @returns {number | null} The smallest value found that is greater than 'lowerBound', or null if none exists.
    */
   nextLarger(lowerBound) {
-    // If the tree is empty, no such value can exist.
-    if (!this.#root) return null;
-
-    let smallestLarger = null; // Initialize to null. This will store our best find so far.
-
-    // Use a queue for BFS, starting with the root node.
-    const queue = [this.#root];
-
-    // Continue as long as there are nodes to visit.
-    while (queue.length > 0) {
-      const node = queue.shift(); // Get the current node from the front of the queue.
-
-      // Check if the current node's value is greater than the lowerBound.
-      if (node.value > lowerBound) {
-        // If it is, we need to see if this value is better (smaller) than
-        // any previous 'smallestLarger' we've found.
-        if (smallestLarger === null || node.value < smallestLarger) {
-          // If smallestLarger is still null (this is the first initialized value)
-          // OR if the current node's value is smaller than the current smallestLarger,
-          // then update smallestLarger to this node's value.
-          smallestLarger = node.value;
-        }
-      }
-
-      // Add existing children to the queue to continue the search.
-      if (node.left) {
-        queue.push(node.left);
-      }
-      if (node.right) {
-        queue.push(node.right);
-      }
+    let visualString;
+    if (!this.#root) {
+      visualString = getVisualTreeString(
+        // Use imported function
+        this.#root, // Pass this.#root
+        `nextLarger - result for ${lowerBound} (empty tree)`
+      );
+      console.log(visualString);
+      return null;
     }
 
-    // After checking all nodes, return the smallest value found that was larger than lowerBound.
-    // If no such node was found, smallestLarger will still be null.
-    return smallestLarger;
+    let smallestLargerNode = null;
+    const queue = [this.#root];
+
+    while (queue.length > 0) {
+      const node = queue.shift();
+      if (node.value > lowerBound) {
+        if (
+          smallestLargerNode === null ||
+          node.value < smallestLargerNode.value
+        ) {
+          smallestLargerNode = node;
+        }
+      }
+      if (node.left) queue.push(node.left);
+      if (node.right) queue.push(node.right);
+    }
+
+    const highlights = new Set();
+    if (smallestLargerNode) highlights.add(smallestLargerNode);
+    const resultValue = smallestLargerNode ? smallestLargerNode.value : null;
+    visualString = getVisualTreeString(
+      // Use imported function
+      this.#root, // Pass this.#root
+      `nextLarger - result for ${lowerBound} (found: ${resultValue})`,
+      highlights
+    );
+    console.log(visualString);
+    return resultValue;
   }
 
   /**
    * Finds the maximum sum of a path in the binary tree.
-   * A "path" can start and end at any node in the tree. It does not need to pass
-   * through the root. Additionally, a path isn't limited to going only downwards; it can "turn"
-   * at a node (e.g., a path could go from a left child, up to the node, then down to its right child).
-   * This implementation uses an iterative post-order traversal approach.
-   * Post-order traversal (processing Left child, then Right child, then the Node itself) is chosen.
-   * This specific order is crucial because it ensures that when we evaluate any given node,
-   * the maximum path sums extending downwards from its children have already been computed and are available.
+   * A "path" can start and end at any node. It can "turn" at a node
+   * (e.g., left child -> node -> right child).
+   * Uses iterative post-order traversal.
+   * Post-order (Left, Right, Node) is chosen because when evaluating a node,
+   * max path sums from its children (needed for calculation) are already computed.
    *
-   * @returns {number} The maximum path sum found in the tree. Returns 0 if the tree is empty.
-   *                   If all node values are negative, it returns the value of the single node
-   *                   that is least negative (i.e., the largest value among the negative numbers).
+   * @returns {number} The maximum path sum. Returns 0 if empty.
+   *                   If all nodes are negative, returns the largest (least negative) node value.
    */
   maxSum() {
-    // If the tree is empty, the maximum sum is 0.
-    if (!this.#root) return 0;
+    let visualString;
+    if (!this.#root) {
+      visualString = getVisualTreeString(
+        this.#root,
+        "maxSum - result (empty tree)"
+      ); // Use imported function
+      console.log(visualString);
+      return 0;
+    }
 
-    // 'sums' will store the maximum sum of a path starting at a particular node
-    // and extending downwards into *at most one* of its subtrees.
-    // A WeakMap (ES2015 feature) is used. WeakMaps allow keys (nodes, in this case)
-    // to be garbage-collected if they are no longer referenced elsewhere, which can be
-    // beneficial for memory management with objects.
+    // sums stores { sum: max path sum ending at this node and going downwards }
     const sums = new WeakMap();
-
-    // Initialize maxSum to negative infinity. This helps correctly find the maximum sum
-    // even if all node values are negative (the max sum would be the least negative value).
-    let maxSum = -Infinity;
-
-    // Define symbolic constants for the phases of our iterative post-order traversal.
-    // This helps simulate the call stack behavior of a recursive post-order traversal.
-    const phases = {
-      visitLeft: 0, // Phase 0: We need to process the left subtree of the current node.
-      visitRight: 1, // Phase 1: Left subtree processed, now process the right subtree.
-      processNode: 2, // Phase 2: Both subtrees processed, ready to process the current node itself.
+    let overallMaxSum = -Infinity;
+    // bestPathInfo stores details about the path that currently yields overallMaxSum
+    let bestPathInfo = {
+      peakNode: null, // The "highest" node in the max sum path, or the node where the path "turns"
+      leftPathSum: 0, // The sum of the path extending leftwards from peakNode (if positive)
+      rightPathSum: 0, // The sum of the path extending rightwards from peakNode (if positive)
     };
 
-    // The stack for iterative traversal. Each item on the stack will be an object
-    // containing a 'node' and its current processing 'phase'.
-    // Start with the root node, initially in the 'visitLeft' phase.
+    const phases = { visitLeft: 0, visitRight: 1, processNode: 2 };
     const stack = [{ node: this.#root, phase: phases.visitLeft }];
 
     while (stack.length > 0) {
-      // Peek at the top item of the stack (without removing it yet).
       const current = stack[stack.length - 1];
       const node = current.node;
-
       if (current.phase === phases.visitLeft) {
-        // Currently in 'visitLeft' phase for 'node'.
-        // Transition to the next phase for 'node': 'visitRight'.
         current.phase = phases.visitRight;
-        // If a left child exists, push it onto the stack to be processed first.
-        // The new item on stack starts in 'visitLeft' phase.
-        if (node.left) {
-          stack.push({ node: node.left, phase: phases.visitLeft });
-        }
+        if (node.left) stack.push({ node: node.left, phase: phases.visitLeft });
       } else if (current.phase === phases.visitRight) {
-        // Currently in 'visitRight' phase for 'node' (meaning left child is processed).
-        // Transition to the next phase for 'node': 'processNode'.
         current.phase = phases.processNode;
-        // If a right child exists, push it onto the stack to be processed.
-        if (node.right) {
+        if (node.right)
           stack.push({ node: node.right, phase: phases.visitLeft });
-        }
       } else {
-        // current.phase === phases.processNode
-        // Currently in 'processNode' phase (both left and right children are processed).
-        // Now we can process the 'node' itself.
-        stack.pop(); // Remove the fully processed node from the stack.
+        stack.pop();
+        const leftData = node.left ? sums.get(node.left) : null;
+        const rightData = node.right ? sums.get(node.right) : null;
 
-        // Get the max sum of a path ending at the left child (and going downwards from it).
-        // If no left child, or if its path sum is negative, consider it 0 for path calculations.
-        // sums.get(node.left) retrieves the value calculated when node.left was processed.
-        const leftSum = node.left ? sums.get(node.left) : 0;
-        // Similarly for the right child.
-        const rightSum = node.right ? sums.get(node.right) : 0;
+        // Max sum of a path ending at node.left/right and going downwards
+        const leftDownwardSum = leftData ? leftData.sum : 0;
+        const rightDownwardSum = rightData ? rightData.sum : 0;
 
-        // Calculate the maximum sum of a path that *could pass through the current node*.
-        // This path might "turn" at the current node (i.e., go from left child, through node, to right child).
-        // It's the node's value plus the best positive contributions from its left and right downward paths.
-        // Math.max(0, childSum) ensures we don't include a child's path if it's negative,
-        // as that would decrease the sum through the current node.
+        // Max sum of a path that "turns" at `node`
         const sumThroughNode =
-          node.value + Math.max(0, leftSum) + Math.max(0, rightSum);
+          node.value +
+          Math.max(0, leftDownwardSum) +
+          Math.max(0, rightDownwardSum);
 
-        // Update the overall maximum sum found so far if sumThroughNode is greater.
-        maxSum = Math.max(maxSum, sumThroughNode);
+        if (sumThroughNode > overallMaxSum) {
+          overallMaxSum = sumThroughNode;
+          bestPathInfo = {
+            peakNode: node,
+            leftPathSum: Math.max(0, leftDownwardSum),
+            rightPathSum: Math.max(0, rightDownwardSum),
+          };
+        }
 
-        // Calculate the maximum sum of a path starting at the current node and extending
-        // downwards into *only one* of its children's branches (or just the node itself if both child paths are negative).
-        // This value is stored in the 'sums' WeakMap and will be used by the parent of the current node.
-        const sumForParent = node.value + Math.max(0, leftSum, rightSum);
-        sums.set(node, sumForParent);
+        // Handle cases where all nodes are negative; overallMaxSum should be the largest single node value.
+        // This check ensures that if sumThroughNode is less than a single node's value (e.g. all negative tree),
+        // the single node value is considered.
+        if (node.value > overallMaxSum) {
+          overallMaxSum = node.value;
+          bestPathInfo = { peakNode: node, leftPathSum: 0, rightPathSum: 0 };
+        }
+
+        // Max sum of a path ending at `node` (and going downwards, for parent's calculation)
+        const sumForParent =
+          node.value + Math.max(0, leftDownwardSum, rightDownwardSum);
+        sums.set(node, { sum: sumForParent });
       }
     }
-    // After iterating through all nodes, maxSum will hold the maximum path sum.
-    // If the tree was non-empty, maxSum will be at least the value of one of its nodes.
-    return maxSum;
+
+    const highlightedPathNodes = new Set();
+    if (bestPathInfo.peakNode) {
+      highlightedPathNodes.add(bestPathInfo.peakNode);
+
+      // Helper to trace a single downward path that contributes positively
+      const traceSingleDownwardPath = (nodeToStartTrace, pathSet) => {
+        let current = nodeToStartTrace;
+        while (current) {
+          pathSet.add(current);
+          const nodeData = sums.get(current);
+          // nodeData.sum is current.value + max(0, best_grandchild_branch_L, best_grandchild_branch_R)
+
+          // If nodeData.sum is just current.value, it means no positive children path
+          if (!nodeData || nodeData.sum <= current.value) {
+            break;
+          }
+
+          const leftChild = current.left;
+          const rightChild = current.right;
+          // Get the sum of the best downward path starting from leftChild/rightChild
+          const leftChildBranchSum =
+            leftChild && sums.has(leftChild)
+              ? sums.get(leftChild).sum
+              : -Infinity; // Use -Infinity to correctly compare
+          const rightChildBranchSum =
+            rightChild && sums.has(rightChild)
+              ? sums.get(rightChild).sum
+              : -Infinity;
+
+          // We need to choose the child that contributed to nodeData.sum
+          // nodeData.sum = current.value + Math.max(0, leftChildBranchSum, rightChildBranchSum)
+          // So, if leftChildBranchSum was chosen and > 0:
+          if (
+            leftChildBranchSum > 0 &&
+            leftChildBranchSum >= rightChildBranchSum
+          ) {
+            current = leftChild;
+          } else if (rightChildBranchSum > 0) {
+            // If rightChildBranchSum was chosen and > 0
+            current = rightChild;
+          } else {
+            break; // No positive child branch contributed
+          }
+        }
+      };
+
+      // If leftPathSum (which is max(0, leftDownwardSum from peak's left child)) is > 0,
+      // it means the left child and its best downward path contributed.
+      if (bestPathInfo.leftPathSum > 0 && bestPathInfo.peakNode.left) {
+        traceSingleDownwardPath(
+          bestPathInfo.peakNode.left,
+          highlightedPathNodes
+        );
+      }
+      // Similarly for the right path
+      if (bestPathInfo.rightPathSum > 0 && bestPathInfo.peakNode.right) {
+        traceSingleDownwardPath(
+          bestPathInfo.peakNode.right,
+          highlightedPathNodes
+        );
+      }
+    }
+
+    visualString = getVisualTreeString(
+      // Use imported function
+      this.#root, // Pass this.#root
+      `maxSum - result (sum: ${overallMaxSum})`,
+      highlightedPathNodes
+    );
+    console.log(visualString);
+    return overallMaxSum;
   }
 
   /**
    * Checks if two nodes in the tree are "cousins".
-   * Cousin nodes are nodes that are at the same depth (level) in the tree
-   * but have different parent nodes.
+   * Cousin nodes are at the same depth but have different parents.
    *
-   * @param {BinaryTreeNode} node1 - The first node to check.
-   * @param {BinaryTreeNode} node2 - The second node to check.
-   * @returns {boolean} True if node1 and node2 are cousins, false otherwise.
+   * @param {BinaryTreeNode} node1 - The first node.
+   * @param {BinaryTreeNode} node2 - The second node.
+   * @returns {boolean} True if cousins, false otherwise.
    */
   areCousins(node1, node2) {
-    // Perform basic checks first:
-    if (!this.#root) return false; // No nodes in an empty tree can be cousins.
-
-    // The root node cannot be a cousin to any node as it has no parent and is at depth 1.
-    // Other nodes must be at depth > 1 to have a parent distinct from another node's parent.
-    if (node1 === this.#root || node2 === this.#root) return false;
-
-    // A node cannot be its own cousin.
-    if (node1 === node2) return false;
-
-    // Object to store information (depth and parent) about node1 and node2,
-    // gathered during the traversal.
-    const info = {
-      depth1: null,
-      parent1: null,
-      depth2: null,
-      parent2: null,
-    };
-
-    // Use the private #traverse (BFS) method to find the depth and parent for both nodes.
-    // The callback function will populate the 'info' object.
+    const highlights = new Set();
+    if (node1) highlights.add(node1);
+    if (node2) highlights.add(node2);
+    let visualString;
+    if (
+      !this.#root ||
+      node1 === this.#root ||
+      node2 === this.#root ||
+      node1 === node2
+    ) {
+      visualString = getVisualTreeString(
+        // Use imported function
+        this.#root, // Pass this.#root
+        "areCousins - result (false due to basic checks)",
+        highlights
+      );
+      console.log(visualString);
+      return false;
+    }
+    const info = { depth1: null, parent1: null, depth2: null, parent2: null };
     this.#traverse(({ node, depth, parent }) => {
       if (node === node1) {
         info.depth1 = depth;
@@ -366,212 +432,229 @@ class BinaryTree {
         info.parent2 = parent;
       }
     });
-
-    // After traversal, check the conditions for being cousins:
-    // 1. Both nodes must have been found in the tree (their depths will not be null).
-    // 2. They must be at the same depth.
-    // 3. They must have different parents.
-    // (The parent1 !== null check also implicitly confirms node1 is not the root,
-    // which was already checked, but it's a good sanity check here).
-    return (
-      info.depth1 !== null && // node1 was found
-      info.depth2 !== null && // node2 was found
-      info.depth1 === info.depth2 && // Same depth
-      info.parent1 !== info.parent2 // Different parents
+    const areTheyCousins =
+      info.depth1 !== null &&
+      info.depth2 !== null &&
+      info.depth1 === info.depth2 &&
+      info.parent1 !== info.parent2;
+    visualString = getVisualTreeString(
+      // Use imported function
+      this.#root, // Pass this.#root
+      `areCousins - result (${areTheyCousins})`,
+      highlights
     );
+    console.log(visualString);
+    return areTheyCousins;
   }
 
   /**
-   * Finds the Lowest Common Ancestor (LCA) of two given nodes in the binary tree.
-   * The LCA is defined as the deepest node in the tree that has both node1 and node2
-   * as descendants (where a node can be a descendant of itself).
+   * Finds the Lowest Common Ancestor (LCA) of two given nodes.
+   * The LCA is the deepest node that has both node1 and node2 as descendants.
    *
    * @param {BinaryTreeNode} node1 - The first node.
    * @param {BinaryTreeNode} node2 - The second node.
-   * @returns {BinaryTreeNode | null} The LCA node if both node1 and node2 are found in the tree,
-   *                                  otherwise null.
+   * @returns {BinaryTreeNode | null} The LCA node, or null if not found or nodes are not in the tree.
    */
   lowestCommonAncestor(node1, node2) {
-    // Helper function to find the path from the root to a specific targetNode.
-    // Returns an array of nodes representing the path if found, otherwise null.
     const findPath = (targetNode) => {
-      if (!this.#root) return null; // No path in an empty tree.
-
-      // Use BFS to find the target node and reconstruct its path.
-      // Each queue item stores the current node and the path taken to reach it.
+      if (!this.#root) return null;
       const queue = [{ node: this.#root, path: [this.#root] }];
 
       while (queue.length > 0) {
         const { node, path } = queue.shift();
-
-        if (node === targetNode) {
-          return path; // Target node found, return the path.
-        }
-
-        // Add children to the queue, extending the current path.
-        // The '...' spread syntax (ES2015) is used to create a new array for the extended path.
-        if (node.left) {
+        if (node === targetNode) return path;
+        if (node.left)
           queue.push({ node: node.left, path: [...path, node.left] });
-        }
-        if (node.right) {
+        if (node.right)
           queue.push({ node: node.right, path: [...path, node.right] });
-        }
       }
-      return null; // Target node not found in the tree.
+      return null;
     };
 
-    // Get the paths from the root to node1 and node2.
     const pathToNode1 = findPath(node1);
     const pathToNode2 = findPath(node2);
 
-    // If either node is not found in the tree, they cannot have an LCA.
-    if (!pathToNode1 || !pathToNode2) return null;
+    const highlights = new Set();
+    if (pathToNode1) pathToNode1.forEach((node) => highlights.add(node));
+    if (pathToNode2) pathToNode2.forEach((node) => highlights.add(node));
 
-    let lca = null; // Variable to store the LCA.
-    // Iterate through both paths simultaneously as long as the nodes at the current position match.
-    // The loop runs up to the length of the shorter path.
+    let visualString;
+    if (!pathToNode1 || !pathToNode2) {
+      visualString = getVisualTreeString(
+        // Use imported function
+        this.#root, // Pass this.#root
+        "lowestCommonAncestor - result (one or both nodes not found)",
+        highlights
+      );
+      console.log(visualString);
+      return null;
+    }
+
+    let lcaNode = null;
     for (let i = 0; i < Math.min(pathToNode1.length, pathToNode2.length); i++) {
       if (pathToNode1[i] === pathToNode2[i]) {
-        // If the nodes at the current index in both paths are the same,
-        // this node is a common ancestor. Update 'lca' to this node.
-        lca = pathToNode1[i];
+        lcaNode = pathToNode1[i];
       } else {
-        // If the nodes differ, the paths have diverged.
-        // The 'lca' found in the previous iteration (if any) is the deepest common ancestor.
         break;
       }
     }
-    // After the loop, 'lca' will hold the deepest node common to both paths.
-    return lca;
+
+    const lcaValue = lcaNode ? lcaNode.value : null;
+    visualString = getVisualTreeString(
+      // Use imported function
+      this.#root, // Pass this.#root
+      `lowestCommonAncestor - result (LCA: ${lcaValue})`,
+      highlights
+    );
+    console.log(visualString);
+    return lcaNode;
   }
 
   /**
-   * Converts (serializes) the binary tree into a string representation.
-   * This method uses a level-order (BFS) traversal. Null children are represented as 'null'
-   * in the string to maintain the tree structure.
-   * Trailing nulls at the end of the serialization are removed for a more compact output.
-   * Example: A tree with root 1, left child 2, right child 3 (where 2 has a left child 4)
-   * might serialize to "[1,2,3,4,null,null,null]" (before trimming trailing nulls)
-   * or more compactly as "[1,2,3,4]".
+   * Converts the binary tree into a plain object representation.
+   * The resulting object mirrors the structure of the tree, with each node represented as an object
+   * containing its value and references to its left and right children (if any).
    *
-   * @param {BinaryTree} tree - The binary tree instance to serialize.
-   * @returns {string} A string representation of the tree (e.g., "[1,2,null,3]").
+   * @returns {Object} The plain object representation of the binary tree.
+   */
+  toObject() {
+    if (!this.#root) return null;
+    const result = {};
+    this.#_buildObjectRecursive(this.#root, result, "root");
+    return result;
+  }
+
+  /**
+   * @private
+   * A recursive helper method for `toObject`.
+   * Builds the object representation of the tree by traversing it and adding each node's data
+   * to the provided result object.
+   *
+   * @param {BinaryTreeNode} node - The current node being visited.
+   * @param {Object} result - The object where the tree's data is being accumulated.
+   * @param {string} nodeName - The name/key for the current node in the result object.
+   */
+  #_buildObjectRecursive(node, result, nodeName) {
+    if (!node) return;
+    result[nodeName] = { value: node.value };
+    if (node.left || node.right) {
+      result[nodeName].children = {};
+      if (node.left) {
+        this.#_buildObjectRecursive(
+          node.left,
+          result[nodeName].children,
+          "left"
+        );
+      }
+      if (node.right) {
+        this.#_buildObjectRecursive(
+          node.right,
+          result[nodeName].children,
+          "right"
+        );
+      }
+    }
+  }
+
+  /**
+   * Visualizes the tree structure in the console using the centered-slash style.
+   */
+  visualize() {
+    const visualString = getVisualTreeString(this.#root, "Visualization"); // Use imported function
+    console.log(visualString);
+  }
+
+  /**
+   * Serializes (converts) the binary tree into a string format.
+   * Uses level-order traversal (BFS). Null nodes are represented as 'null'.
+   *
+   * @param {BinaryTree} tree - The binary tree to be serialized.
+   * @returns {string} The serialized string representation of the tree.
    */
   static serialize(tree) {
-    // If the tree has no root (it's an empty tree), serialize to an empty array string.
-    if (!tree.#root) return "[]";
-
-    const values = []; // Array to store the values of nodes in level-order.
-    // Queue for level-order traversal. It can contain actual nodes or null placeholders
-    // for missing children, which is important for correct deserialization.
+    if (tree && tree.#root) {
+      // Check if tree and root exist
+      console.log(getVisualTreeString(tree.#root, "serialize - input tree"));
+    } else {
+      console.log("\n--- serialize - input tree ---");
+      console.log(
+        !tree || !(tree instanceof BinaryTree) || !tree.#root // More robust check
+          ? "<empty tree or invalid tree object>"
+          : "Tree object provided, but _getVisualTreeString not available." // This message might be obsolete
+      );
+      console.log("------------------------------------------");
+    }
+    if (!tree || !tree.#root) return "[]";
+    const result = [];
     const queue = [tree.#root];
-    let i = 0; // Index to keep track of the current node being processed from the 'queue' array.
-    // This simulates dequeuing while allowing us to check queue.length for termination.
 
-    // Continue as long as 'i' is within the bounds of items pushed to the queue.
-    // This loop structure ensures we process all nodes and null placeholders that define the structure.
-    while (i < queue.length) {
-      const node = queue[i++]; // Get the current node (or null placeholder) and advance 'i'.
-
+    while (queue.length > 0) {
+      const node = queue.shift();
       if (node) {
-        // If it's an actual node, add its value to the 'values' array.
-        values.push(node.value);
-        // Add its children to the queue for later processing.
-        // It's crucial to add 'null' if a child doesn't exist, to preserve the tree structure.
+        result.push(node.value);
         queue.push(node.left);
         queue.push(node.right);
       } else {
-        // If 'node' is a null placeholder, add 'null' to the 'values' array.
-        // We don't add children for a null placeholder, as it has none.
-        values.push(null);
+        result.push(null);
       }
     }
 
-    // After collecting all values (including potentially many trailing nulls),
-    // trim these trailing nulls for a cleaner and more compact serialized string.
-    let lastNonNullIndex = values.length - 1;
-    while (lastNonNullIndex >= 0 && values[lastNonNullIndex] === null) {
-      lastNonNullIndex--;
+    // Remove trailing nulls for a cleaner output
+    while (result.length > 0 && result[result.length - 1] === null) {
+      result.pop();
     }
-    // Slice the array to include elements only up to the last non-null value.
-    const trimmedValues = values.slice(0, lastNonNullIndex + 1);
 
-    // Construct the final string representation.
-    // Template literals (ES2015 feature) are used for easy string construction.
-    return `[${trimmedValues.join(",")}]`;
+    const serializedString = JSON.stringify(result);
+    console.log(`--- serialize - output string: ${serializedString} ---`);
+    return serializedString;
   }
 
   /**
    * Rebuilds (deserializes) a binary tree from its string representation.
-   * The input string is expected to be in the format produced by the `serialize` method
-   * (i.e., a level-order traversal with 'null' for missing children).
+   * Expects format from `serialize` (level-order with 'null' for missing children).
    *
-   * @param {string} serialized - The string representation of the tree.
+   * @param {string} serialized - The serialized string representation of the tree.
    * @returns {BinaryTree} The deserialized binary tree.
    */
   static deserialize(serialized) {
-    // If the string represents an empty array, return a new empty BinaryTree.
+    console.log(`\n--- Deserializing input: ${serialized} ---`);
     if (serialized === "[]") return new BinaryTree();
-
-    // Parse the input string into an array of actual values (numbers or nulls).
-    // 1. Remove the outer brackets: "\[1,null,2]" -> "1,null,2".
-    // 2. Split the string by commas: "1,null,2" -> ["1", "null", "2"].
-    const stringValues = serialized.slice(1, -1).split(",");
-    // 3. Convert string values to numbers or null.
-    //    The map function (ES2015 arrow function) iterates over stringValues.
-    const values = stringValues.map((valueStr) => {
-      if (valueStr === "null" || valueStr === "") return null; // Handle "null" strings and potential empty strings.
-      return Number(valueStr); // Convert other values to numbers.
+    const contentWithoutBrackets = serialized.slice(1, -1);
+    const stringValuesArray = contentWithoutBrackets.split(",");
+    const values = stringValuesArray.map((valueStr) => {
+      if (valueStr === "null" || valueStr === "") return null;
+      return Number(valueStr);
     });
-
-    // If the parsed values array is empty or the first value (root) is null,
-    // it represents an empty or invalid tree structure.
-    if (values.length === 0 || values[0] === null) {
-      return new BinaryTree();
-    }
-
-    // Create the root node from the first value in the array.
+    if (values.length === 0 || values[0] === null) return new BinaryTree();
     const rootNode = new BinaryTreeNode(values[0]);
-    const tree = new BinaryTree(rootNode); // Create the new BinaryTree instance with this root.
-
-    // Use a queue to keep track of parent nodes whose children need to be assigned.
-    // This queue will hold actual BinaryTreeNode objects.
-    const queue = [rootNode];
-    let i = 1; // Index for the 'values' array, starting from the element after the root's value.
-
-    // Process nodes in the 'queue' to attach their children based on the 'values' array.
-    // Continue as long as there are values to process and parent nodes in the queue.
-    while (i < values.length && queue.length > 0) {
-      const parentNode = queue.shift(); // Get the next parent node from the queue.
-
-      // Attempt to assign the left child.
-      if (i < values.length) {
-        // Check if there's a value in the 'values' array for the left child.
-        const leftVal = values[i++]; // Get the value and advance the index.
+    const tree = new BinaryTree(rootNode);
+    const buildQueue = [rootNode];
+    let parentIdx = 0,
+      valueIdx = 1;
+    const numValuesToProcess = values.length;
+    while (valueIdx < numValuesToProcess && parentIdx < buildQueue.length) {
+      const parentNode = buildQueue[parentIdx++];
+      if (valueIdx < numValuesToProcess) {
+        const leftVal = values[valueIdx++];
         if (leftVal !== null) {
-          // If the value is not null, create a new node.
           parentNode.left = new BinaryTreeNode(leftVal);
-          queue.push(parentNode.left); // Add the new left child to the queue for its children.
+          buildQueue.push(parentNode.left);
         }
       }
-
-      // Attempt to assign the right child.
-      if (i < values.length) {
-        // Check if there's a value for the right child.
-        const rightVal = values[i++]; // Get the value and advance the index.
+      if (valueIdx < numValuesToProcess) {
+        const rightVal = values[valueIdx++];
         if (rightVal !== null) {
-          // If not null, create the node.
           parentNode.right = new BinaryTreeNode(rightVal);
-          queue.push(parentNode.right); // Add to queue for its children.
+          buildQueue.push(parentNode.right);
         }
       }
     }
-    // Return the fully reconstructed tree.
+    if (tree.#root) {
+      // Check if tree and root exist
+      console.log(getVisualTreeString(tree.#root, "deserialize - output tree"));
+    }
     return tree;
   }
 }
 
-// This is CommonJS module export syntax, typically used in Node.js environments.
-// It makes the BinaryTree and BinaryTreeNode classes available for import in other files
-// using require(), e.g., const { BinaryTree, BinaryTreeNode } = require('./binary-tree');
 module.exports = { BinaryTree, BinaryTreeNode };
