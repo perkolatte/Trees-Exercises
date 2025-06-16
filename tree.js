@@ -1,5 +1,3 @@
-const { getVisualTreeString } = require("./tree-visualizer"); // Assuming tree-visualizer.js is in the same directory
-
 /** TreeNode: node for a general tree. */
 class TreeNode {
   constructor(val, children = []) {
@@ -15,24 +13,9 @@ class Tree {
     this.#root = root;
   }
 
-  /** Helper method to log the tree structure */
-  log(context = "Current tree state", highlights = new Set()) {
-    if (!this.#root) {
-      console.log(
-        `\n--- ${context} ---\n<empty tree>\n------------------------------------------`
-      );
-      return;
-    }
-    // Note: tree-visualizer is designed for binary trees.
-    // Visualization of general trees will be limited (likely only showing the root).
-    const visualString = getVisualTreeString(this.#root, context, highlights);
-    console.log(visualString);
-  }
-
   /** sumValues(): add up all of the values in the tree. */
   sumValues() {
     if (!this.#root) {
-      this.log("sumValues - result (sum: 0)");
       return 0;
     }
 
@@ -48,15 +31,12 @@ class Tree {
         toSum.push(child);
       }
     }
-
-    this.log(`sumValues - result (sum: ${total})`, allNodes);
     return total;
   }
 
   /** countEvens(): count all of the nodes in the tree with even values. */
   countEvens() {
     if (!this.#root) {
-      this.log("countEvens - result (count: 0)");
       return 0;
     }
 
@@ -74,8 +54,6 @@ class Tree {
         toCount.push(child);
       }
     }
-
-    this.log(`countEvens - result (count: ${count})`, evenNodes);
     return count;
   }
 
@@ -83,7 +61,6 @@ class Tree {
    * whose value is greater than lowerBound. */
   numGreater(lowerBound) {
     if (!this.#root) {
-      this.log(`numGreater(${lowerBound}) - result (count: 0)`);
       return 0;
     }
 
@@ -101,10 +78,6 @@ class Tree {
         toCount.push(child);
       }
     }
-    this.log(
-      `numGreater(${lowerBound}) - result (count: ${count})`,
-      greaterNodes
-    );
     return count;
   }
 }
